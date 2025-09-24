@@ -13,6 +13,7 @@
 
 #include "spdk_internal/nvme_util.h"
 
+#include "../../../lib/nvme/nvme_internal.h"
 #include "../../../lib/nvme/nvme_pcie_internal.h"
 
 #include <getopt.h>
@@ -228,7 +229,7 @@ parse_nonnegative_u32(const char *arg, uint32_t *value)
 	uint64_t tmp;
 
 	tmp = strtoull(arg, &endptr, 10);
-	if (endptr == NULL || *endptr != '\\0' || tmp > UINT32_MAX) {
+	if (endptr == NULL || *endptr != '\0' || tmp > UINT32_MAX) {
 		return -EINVAL;
 	}
 
