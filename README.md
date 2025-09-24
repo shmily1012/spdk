@@ -269,6 +269,32 @@ as a privileged user (root) unless you've done additional configuration
 to grant your user permission to allocate huge pages and map devices through
 vfio.
 
+## Custom New Test: WRR Burst Test
+
+### Summary
+The WRR Burst Test is an example application that demonstrates Weighted Round Robin (WRR) arbitration in NVMe controllers. It creates multiple I/O queues with different priority weights (high, medium, low) and submits burst commands to evaluate how the controller arbitrates between queues based on their assigned weights. The test measures and logs completion statistics to analyze the effectiveness of the WRR scheduling.
+
+### Operating Actions
+1. **Build the test**: The example is automatically compiled as part of the SPDK build process.
+2. **Run with parameters**: Execute the test with various command-line options to configure the test behavior:
+   - `-W`: Send write commands instead of reads
+   - `-C <num>`: Set commands per qpair (default 255)
+   - `-N <num>`: Set logical blocks per command (default 8)
+   - `-S <lba>`: Set starting LBA (default 0)
+   - `-Q <entries>`: Set IO queue size per qpair (default 512)
+   - `-O <path>`: Write completion log to specified path (default wrr_burst_log.csv)
+   - `--hpw <w>`: Set high priority weight (1-256, default 32)
+   - `--mpw <w>`: Set medium priority weight (1-256, default 16)
+   - `--lpw <w>`: Set low priority weight (1-256, default 4)
+   - `--burst <v>`: Set arbitration burst (0-7, default 7)
+
+3. **Analyze results**: The test outputs a CSV log file with submission/completion timing and statistics, showing the percentage of completions for each priority queue.
+
+Example command:
+```
+./build/examples/wrr_burst_test -r "trtype:PCIe" --hpw 64 --mpw 16 --lpw 4
+```
+
 <a id="python"></a>
 ## Python bindings
 
