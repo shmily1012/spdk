@@ -83,6 +83,7 @@ struct completion_vector {
 	size_t capacity;
 };
 
+/* Application defaults; tweakable via CLI. */
 static struct app_config g_cfg = {
 	.cmds_per_queue = 255,
 	.lba_count = 8,
@@ -258,6 +259,7 @@ parse_weight(const char *arg, uint16_t *weight)
 	return 0;
 }
 
+/* Parse CLI flags, populate env opts and overrides. */
 static int
 parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 {
@@ -402,6 +404,7 @@ parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 	return 0;
 }
 
+/* Track namespaces discovered on each controller. */
 static void
 register_ns(struct spdk_nvme_ctrlr *ctrlr, struct spdk_nvme_ns *ns)
 {
@@ -425,6 +428,7 @@ register_ns(struct spdk_nvme_ctrlr *ctrlr, struct spdk_nvme_ns *ns)
 	       (uintmax_t)(spdk_nvme_ns_get_size(ns) / (uint64_t)1024 / 1024 / 1024));
 }
 
+/* Record controller metadata and enumerate namespaces. */
 static void
 register_ctrlr(struct spdk_nvme_ctrlr *ctrlr)
 {
@@ -454,6 +458,7 @@ register_ctrlr(struct spdk_nvme_ctrlr *ctrlr)
 	}
 }
 
+/* Tear down controllers/namespaces and free buffers. */
 static void
 cleanup(void)
 {
@@ -477,6 +482,7 @@ cleanup(void)
 	}
 }
 
+/* Configure the controller before attaching. */
 static bool
 probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	 struct spdk_nvme_ctrlr_opts *opts)
@@ -499,6 +505,7 @@ probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	return true;
 }
 
+/* Attach callback populates tracking lists for later use. */
 static void
 attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	  struct spdk_nvme_ctrlr *ctrlr, const struct spdk_nvme_ctrlr_opts *opts)
@@ -510,6 +517,7 @@ attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	register_ctrlr(ctrlr);
 }
 
+/* Store completion metadata for later analysis. */
 static void
 io_complete(void *arg, const struct spdk_nvme_cpl *cpl)
 {
@@ -531,6 +539,7 @@ io_complete(void *arg, const struct spdk_nvme_cpl *cpl)
 	}
 }
 
+/* Populate SQ entries for a single qpair while deferring the doorbell. */
 static int
 submit_burst(struct qpair_ctx *ctx, struct spdk_nvme_ns *ns)
 {
@@ -572,6 +581,7 @@ submit_burst(struct qpair_ctx *ctx, struct spdk_nvme_ns *ns)
 	return 0;
 }
 
+/* Issue a single doorbell per qpair now that SQs are ready. */
 static void
 flush_submissions(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 {
@@ -601,6 +611,7 @@ reserve_completion_capacity(void)
 	return completion_vector_reserve((size_t)total);
 }
 
+/* Dump a CSV with submission/completion timing plus statistics. */
 static int
 dump_completion_log(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 {
@@ -673,6 +684,7 @@ dump_completion_log(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 	return rc;
 }
 
+/* Orchestrate queue creation, workload submission, and completion polling. */
 static int
 run_wrr_burst_test(struct ns_entry *target)
 {
@@ -737,7 +749,7 @@ run_wrr_burst_test(struct ns_entry *target)
 			goto cleanup;
 		}
 
-		memset(ctx->data_pool, (int)(i + 1), ctx->payload_size * g_cfg.cmds_per_queue);
+		memset(ctx->data_pool, (uint8_t)(i + 1), ctx->payload_size * g_cfg.cmds_per_queue);
 
 		ctx->entries = calloc(g_cfg.cmds_per_queue, sizeof(struct cmd_entry));
 		if (ctx->entries == NULL) {
@@ -801,6 +813,7 @@ cleanup:
 	return rc;
 }
 
+/* Entry point: parse CLI, probe devices, and kick off the test. */
 int
 main(int argc, char **argv)
 {
