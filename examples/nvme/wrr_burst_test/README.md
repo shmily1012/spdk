@@ -36,6 +36,7 @@ Useful options:
 - `-O <path>` CSV output path (default `wrr_burst_log.csv`; use `-` for stdout).
 - `--hpw`, `--mpw`, `--lpw` High/medium/low WRR weights (defaults 32/16/4).
 - `--burst <0-7>` Arbitration burst value (default 7).
+- `--mrrs <0-5>` Override Max Read Request Size (code 0=128B, 1=256B, etc.; default auto).
 - `-W` Issue writes instead of reads.
 
 To pin the test to a specific PCIe device, supply the BDF in the transport ID. For example:
@@ -47,7 +48,7 @@ sudo build/examples/nvme/wrr_burst_test/wrr_burst_test \
 
 SPDK parses the `traddr` string and matches it against the controller's bus:device.function address during `spdk_nvme_probe()`, so only the selected device is attached.
 
-At runtime the tool allocates nine qpairs (3 high, 3 medium, 3 low), primes each with 255 commands, rings all doorbells, then polls completions while recording timing metadata.
+At runtime the tool allocates nine qpairs (3 high, 3 medium, 3 low), primes each with 255 commands, optionally overrides the endpoint's MRRS, writes a 0xFFFF config-space marker at offset 0, rings all doorbells, then polls completions while recording timing metadata.
 
 ## Trace Support
 
@@ -66,25 +67,7 @@ The CSV contains one row per command with:
 - submission sequence index
 - qpair ID and priority class
 - command ID, opcode, SLBA, NLB
-- submit / complete timestamps (µs) and latency
+- submit / complete timestamps (us) and latency
 - completion status string
 
 Use this data to verify that completion shares track the configured WRR weights.
-
-##################
-root@PAE-system:~/spdk# make
-ninja: Entering directory `/root/spdk/dpdk/build-tmp'
-ninja: no work to do.
-  CC examples/nvme/wrr_burst_test/wrr_burst_test.o
-wrr_burst_test.c: In function ‘probe_cb’:
-wrr_burst_test.c:484:9: warning: implicit declaration of function ‘SPDK_UNUSED’ [-Wimplicit-function-declaration]
-  484 |         SPDK_UNUSED(cb_ctx);
-      |         ^~~~~~~~~~~
-wrr_burst_test.c: In function ‘dump_completion_log’:
-wrr_burst_test.c:633:53: error: ‘struct spdk_nvme_status’ has no member named ‘raw’
-  633 |                 struct spdk_nvme_status status = { .raw = entry->status_raw };
-      |                                                     ^~~
-make[3]: *** [/root/spdk/mk/spdk.common.mk:540: wrr_burst_test.o] Error 1
-make[2]: *** [/root/spdk/mk/spdk.subdirs.mk:16: wrr_burst_test] Error 2
-make[1]: *** [/root/spdk/mk/spdk.subdirs.mk:16: nvme] Error 2
-make: *** [/root/spdk/mk/spdk.subdirs.mk:16: examples] Error 2

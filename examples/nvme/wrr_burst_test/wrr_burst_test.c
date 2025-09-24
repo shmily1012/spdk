@@ -13,6 +13,8 @@
 
 #include "spdk_internal/nvme_util.h"
 
+#include "../../../lib/nvme/nvme_pcie_internal.h"
+
 #include <getopt.h>
 #include <inttypes.h>
 
@@ -807,6 +809,8 @@ run_wrr_burst_test(struct ns_entry *target)
 	uint64_t lbas_per_qpair = (uint64_t)g_cfg.cmds_per_queue * g_cfg.lba_count;
 	uint64_t total_lbas = lbas_per_qpair * NUM_TEST_QPAIRS;
 	uint64_t max_lba = g_cfg.start_lba + total_lbas;
+	const struct spdk_nvme_transport_id *ctrlr_trid;
+	bool ctrlr_is_pcie;
 	struct spdk_pci_device *pci_dev;
 	uint32_t i;
 	int rc = 0;
@@ -829,6 +833,8 @@ run_wrr_burst_test(struct ns_entry *target)
 		return rc;
 	}
 
+	ctrlr_trid = spdk_nvme_ctrlr_get_transport_id(target->ctrlr);
+	ctrlr_is_pcie = (ctrlr_trid != NULL && ctrlr_trid->trtype == SPDK_NVME_TRANSPORT_PCIE);
 	pci_dev = spdk_nvme_ctrlr_get_pci_device(target->ctrlr);
 	if (g_cfg.mrrs_index >= 0) {
 		if (pci_dev == NULL) {
@@ -894,6 +900,12 @@ run_wrr_burst_test(struct ns_entry *target)
 
 		ctx->qprio = priorities[i];
 		ctx->qid = spdk_nvme_qpair_get_id(ctx->qpair);
+		if (ctrlr_is_pcie) {
+			struct nvme_pcie_qpair *pqpair = nvme_pcie_qpair(ctx->qpair);
+			uint64_t sq_base = pqpair ? pqpair->cmd_bus_addr : 0;
+			printf("  IOSQ%u base address : 0x%016" PRIx64 "\n",
+			       ctx->qid, sq_base);
+		}
 		ctx->index = i;
 		ctx->base_lba = g_cfg.start_lba + lbas_per_qpair * i;
 
