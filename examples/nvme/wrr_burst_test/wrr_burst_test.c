@@ -297,23 +297,9 @@ set_endpoint_mrrs(struct spdk_pci_device *pci_dev, uint8_t code)
 		}
 
 		if (cap_id == PCI_CAP_ID_EXP) {
-			uint32_t devcap;
-			uint8_t max_payload_code;
 			uint16_t devctl;
 			uint16_t new_devctl;
 			uint32_t devctl_offset = pos + PCI_EXP_DEVCTL;
-
-			rc = spdk_pci_device_cfg_read32(pci_dev, &devcap, pos + PCI_EXP_DEVCAP);
-			if (rc != 0) {
-				return rc;
-			}
-
-			max_payload_code = (uint8_t)(devcap & PCI_EXP_DEVCAP_MAX_PAYLOAD_MASK);
-			if (code > max_payload_code) {
-				SPDK_WARNLOG("Requested MRRS code %u exceeds Max Payload Size Supported %u\n",
-					code, max_payload_code);
-				return -ERANGE;
-			}
 
 			rc = spdk_pci_device_cfg_read16(pci_dev, &devctl, devctl_offset);
 			if (rc != 0) {
