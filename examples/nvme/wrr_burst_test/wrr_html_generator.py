@@ -467,8 +467,9 @@ def generate_html(high_row, medium_row, low_row, output_file, split_ids=None):
         }}
         
         .info-panel h3::before {{
-            content: "📊";
+            content: "▣";
             font-size: 1.2rem;
+            color: #3b82f6;
         }}
         
         .info-panel p {{
@@ -685,7 +686,7 @@ def generate_html(high_row, medium_row, low_row, output_file, split_ids=None):
 </html>""".format(data_length, high_events, medium_events, low_events)
     
     try:
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
         print("HTML file generated successfully: {0}".format(output_file))
     except Exception as e:
