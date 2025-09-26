@@ -778,6 +778,16 @@ dump_completion_log(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 		rc = g_log_error;
 	}
 
+	printf("\nArbitration Configuration:\n");
+	printf("┌────────────────┬───────┐\n");
+	printf("│ Parameter      │ Value │\n");
+	printf("├────────────────┼───────┤\n");
+	printf("│ AB             │ %5u │\n", g_cfg.arbitration_burst);
+	printf("│ High Weight    │ %5u │\n", g_cfg.hpw);
+	printf("│ Middle Weight  │ %5u │\n", g_cfg.mpw);
+	printf("│ Low Weight     │ %5u │\n", g_cfg.lpw);
+	printf("└────────────────┴───────┘\n");
+
 	return rc;
 }
 
@@ -890,7 +900,7 @@ run_wrr_burst_test(struct ns_entry *target)
 		if (ctrlr_is_pcie) {
 			struct nvme_pcie_qpair *pqpair = nvme_pcie_qpair(ctx->qpair);
 			uint64_t sq_base = pqpair ? pqpair->cmd_bus_addr : 0;
-			printf("  IOSQ%u base address : 0x%016" PRIx64 "\n",
+			printf("SQ%u_base_adr = 0x%" PRIx64 "\n",
 			       ctx->qid, sq_base);
 		}
 		ctx->index = i;
