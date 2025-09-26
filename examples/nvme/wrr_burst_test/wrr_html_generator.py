@@ -205,6 +205,11 @@ def generate_html(high_row, medium_row, low_row, output_file, split_ids=None):
     
     data_length = len(high_row) - 1  # Subtract 1 for the header column
     
+    # Calculate statistics for each priority level
+    high_events = len([x for x in high_row[1:] if x.strip() and x.strip().isdigit()])
+    medium_events = len([x for x in medium_row[1:] if x.strip() and x.strip().isdigit()])
+    low_events = len([x for x in low_row[1:] if x.strip() and x.strip().isdigit()])
+    
     # Use provided split IDs or generate fallback ones
     if split_ids is None or len(split_ids) == 0:
         # Fallback: generate sequential split IDs
@@ -235,117 +240,335 @@ def generate_html(high_row, medium_row, low_row, output_file, split_ids=None):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WRR Trace Analysis Results</title>
     <style>
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
         body {{
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
         }}
         
         .container {{
             max-width: 100%;
-            overflow-x: auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            animation: fadeInUp 0.8s ease-out;
+        }}
+        
+        @keyframes fadeInUp {{
+            from {{
+                opacity: 0;
+                transform: translateY(30px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+        
+        .header {{
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
         }}
         
         h1 {{
-            color: #333;
-            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }}
+        
+        .subtitle {{
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }}
+        
+        .content {{
+            padding: 30px;
+        }}
+        
+        .table-wrapper {{
+            overflow-x: auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             margin-bottom: 30px;
         }}
         
         table {{
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 13px;
             min-width: 1200px;
+            background: white;
         }}
         
         th, td {{
-            border: 1px solid #000;
-            padding: 4px 6px;
+            border: 1px solid #e5e7eb;
+            padding: 8px 12px;
             text-align: center;
-            height: 25px;
-            min-width: 30px;
+            height: 40px;
+            min-width: 40px;
+            position: relative;
+            transition: all 0.2s ease;
         }}
         
-        .header-row {{
-            background-color: #e6e6e6;
-            font-weight: bold;
+        th:hover, td:hover {{
+            background-color: #f8fafc !important;
+            transform: scale(1.02);
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }}
+        
+        .header-row th {{
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 12px;
         }}
         
         .label-col {{
-            background-color: #e6e6e6;
-            font-weight: bold;
-            min-width: 80px;
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+            color: white !important;
+            font-weight: 600;
+            min-width: 100px;
             text-align: left;
-            padding-left: 10px;
+            padding-left: 16px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }}
         
         .high-q {{
-            background-color: #ffcccc;
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
         }}
         
         .medium-q {{
-            background-color: #ffffcc;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
         }}
         
         .low-q {{
-            background-color: #ccffcc;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
         }}
         
         .queue-active {{
-            background-color: #ff6666;
-            color: white;
-            font-weight: bold;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: white !important;
+            font-weight: 700;
+            font-size: 14px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            animation: pulseActive 2s infinite;
+            border: 2px solid #b91c1c !important;
         }}
         
         .queue-active.medium {{
-            background-color: #ffaa00;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            border-color: #b45309 !important;
         }}
         
         .queue-active.low {{
-            background-color: #00aa00;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            border-color: #047857 !important;
+        }}
+        
+        @keyframes pulseActive {{
+            0%, 100% {{
+                transform: scale(1);
+            }}
+            50% {{
+                transform: scale(1.05);
+            }}
         }}
         
         .split-id-row {{
-            background-color: #f0f0f0;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            font-weight: 500;
         }}
         
-        .info-panel {{
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-left: 4px solid #007bff;
+        .split-id-row td {{
+            color: #475569;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
         }}
         
         .legend {{
-            margin-top: 20px;
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
-            flex-wrap: wrap;
+            margin: 30px 0;
         }}
         
         .legend-item {{
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 12px;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }}
+        
+        .legend-item:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: #3b82f6;
         }}
         
         .legend-color {{
-            width: 20px;
-            height: 20px;
-            border: 1px solid #000;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }}
+        
+        .legend-item span {{
+            font-weight: 500;
+            color: #374151;
+        }}
+        
+        .info-panel {{
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-top: 30px;
+        }}
+        
+        .info-panel h3 {{
+            color: #1e293b;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .info-panel h3::before {{
+            content: "📊";
+            font-size: 1.2rem;
+        }}
+        
+        .info-panel p {{
+            line-height: 1.6;
+            color: #475569;
+            margin-bottom: 12px;
+        }}
+        
+        .info-panel p strong {{
+            color: #1e293b;
+            font-weight: 600;
+        }}
+        
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }}
+        
+        .stat-item {{
+            background: white;
+            padding: 16px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+        }}
+        
+        .stat-value {{
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #3b82f6;
+            display: block;
+        }}
+        
+        .stat-label {{
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-top: 4px;
+        }}
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {{
+            body {{
+                padding: 10px;
+            }}
+            
+            .header {{
+                padding: 30px 20px;
+            }}
+            
+            h1 {{
+                font-size: 2rem;
+            }}
+            
+            .content {{
+                padding: 20px;
+            }}
+            
+            table {{
+                font-size: 11px;
+            }}
+            
+            th, td {{
+                padding: 6px 8px;
+                min-width: 35px;
+            }}
+        }}
+        
+        /* Print Styles */
+        @media print {{
+            body {{
+                background: white;
+                padding: 0;
+            }}
+            
+            .container {{
+                box-shadow: none;
+                border-radius: 0;
+            }}
+            
+            .header {{
+                background: #4f46e5 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }}
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>WRR Trace Analysis Results</h1>
+        <div class="header">
+            <h1>WRR Trace Analysis Results</h1>
+            <p class="subtitle">Weighted Round Robin Queue Activity Visualization</p>
+        </div>
         
-        <table>
+        <div class="content">
+            <div class="table-wrapper">
+                <table>
             <tr class="header-row">
                 <th class="label-col">idx</th>"""
     
@@ -404,35 +627,62 @@ def generate_html(high_row, medium_row, low_row, output_file, split_ids=None):
     
     html_content += """
             </tr>
-        </table>
+                </table>
+            </div>
         
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color queue-active"></div>
-                <span>High Priority Queue Active</span>
+                <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color queue-active"></div>
+                    <span>High Priority Queue Active (1-3)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color queue-active medium"></div>
+                    <span>Medium Priority Queue Active (4-6)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color queue-active low"></div>
+                    <span>Low Priority Queue Active (7-9)</span>
+                </div>
             </div>
-            <div class="legend-item">
-                <div class="legend-color queue-active medium"></div>
-                <span>Medium Priority Queue Active</span>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value">{1}</span>
+                    <div class="stat-label">High Priority Events</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{2}</span>
+                    <div class="stat-label">Medium Priority Events</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{3}</span>
+                    <div class="stat-label">Low Priority Events</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{0}</span>
+                    <div class="stat-label">Total Time Slices</div>
+                </div>
             </div>
-            <div class="legend-item">
-                <div class="legend-color queue-active low"></div>
-                <span>Low Priority Queue Active</span>
-            </div>
-        </div>
         
-        <div class="info-panel">
-            <h3>Analysis Information</h3>
-            <p><strong>Total Columns:</strong> {0}</p>
-            <p><strong>High Priority Queues:</strong> 1, 2, 3</p>
-            <p><strong>Medium Priority Queues:</strong> 4, 5, 6</p>
-            <p><strong>Low Priority Queues:</strong> 7, 8, 9</p>
-            <p><strong>Description:</strong> This visualization shows the activity of different priority queues over time. 
-               Each column represents a time slice, and the numbers in colored cells indicate which specific queue was active.</p>
+            <div class="info-panel">
+                <h3>Analysis Information</h3>
+                <p><strong>Queue Configuration:</strong></p>
+                <p>• <strong>High Priority:</strong> Queues 1, 2, 3 (Red indicators)</p>
+                <p>• <strong>Medium Priority:</strong> Queues 4, 5, 6 (Orange indicators)</p> 
+                <p>• <strong>Low Priority:</strong> Queues 7, 8, 9 (Green indicators)</p>
+                
+                <p><strong>Visualization Details:</strong></p>
+                <p>This interactive visualization displays Weighted Round Robin (WRR) arbitration behavior over time. Each column represents a time slice where queue activity is captured. The colored cells with numbers indicate which specific queue was active during that period. The split transaction IDs help correlate the activity with the original trace data.</p>
+                
+                <p><strong>Analysis Tips:</strong></p>
+                <p>• Look for patterns in queue activation sequences</p>
+                <p>• Observe how different priority levels are scheduled</p>
+                <p>• Check for proper WRR weight distribution effectiveness</p>
+            </div>
         </div>
     </div>
 </body>
-</html>""".format(data_length)
+</html>""".format(data_length, high_events, medium_events, low_events)
     
     try:
         with open(output_file, 'w') as f:
