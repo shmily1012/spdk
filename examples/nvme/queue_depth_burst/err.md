@@ -1,49 +1,34 @@
-Attached to 0000:01:00.0
-  Namespace ID: 1 size: 3840GB
-
-Namespace 1 information:
-  Sector size          : 512 bytes
-  Total sectors        : 7501476528
-  Controller MQES      : 16384 entries
-  Qpair 0 depth 256 base LBA 0
-
-Burst parameters:
-  Queue pairs          : 1
-  Commands per queue   : 256
-  LBA stride           : 34
-  LBAs per command     : 1
-  Mode                 : read
-
-Results:
-  Commands completed   : 256
-  Errors               : 0
-  Elapsed time         : 0.001479 s
-  Simulated IOPS       : 173123.78
-EAL: '-c <coremask>' option is deprecated, and will be removed in a future release
-EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead
-Unable to parse IOPS from stride 34 output.
-Probing NVMe controller at 0000:01:00.0
-Attached to 0000:01:00.0
-  Namespace ID: 1 size: 3840GB
-
-Namespace 1 information:
-  Sector size          : 512 bytes
-  Total sectors        : 7501476528
-  Controller MQES      : 16384 entries
-  Qpair 0 depth 256 base LBA 0
-
-Burst parameters:
-  Queue pairs          : 1
-  Commands per queue   : 256
-  LBA stride           : 35
-  LBAs per command     : 1
-  Mode                 : read
-
-Results:
-  Commands completed   : 256
-  Errors               : 0
-  Elapsed time         : 0.001561 s
-  Simulated IOPS       : 163995.20
-EAL: '-c <coremask>' option is deprecated, and will be removed in a future release
-EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead
-Unable to parse IOPS from stride 35 output.
+Namespace 1 information:                                                                                                                                                                                                                  
+  Sector size          : 512 bytes                                                                                                                                                                                                        
+  Total sectors        : 7501476528                                                                                                                                                                                                       
+  Controller MQES      : 16384 entries                                                                                                                                                                                                    
+  Qpair 0 depth 256 base LBA 0                                                                                                                                                                                                            
+                                                                                                                                                                                                                                          
+Burst parameters:                                                                                                                                                                                                                         
+  Queue pairs          : 1                                                                                                                                                                                                                
+  Commands per queue   : 256                                                                                                                                                                                                              
+  LBA stride           : 8                                                                                                                                                                                                                
+  LBAs per command     : 1                                                                                                                                                                                                                
+  Mode                 : read                                                                                                                                                                                                             
+                                                                                                                                                                                                                                          
+Results:                                                                                                                                                                                                                                  
+  Commands completed   : 256                                                                                                                                                                                                              
+  Errors               : 0                                                                                                                                                                                                                
+  Elapsed time         : 0.001314 s                                                                                                                                                                                                       
+  Simulated IOPS       : 194766.45                                                                                                                                                                                                        
+EAL: '-c <coremask>' option is deprecated, and will be removed in a future release                                                                                                                                                        
+EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead                                                                                                                                                                       
+Probing NVMe controller at 0000:01:00.0                                                                                                                                                                                                   
+EAL: '-c <coremask>' option is deprecated, and will be removed in a future release                                                                                                                                                        
+EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead                                                                                                                                                                       
+[2025-09-29 22:37:53.596453] nvme_pcie.c: 335:nvme_pcie_ctrlr_map_cmb: *ERROR*: [nqn.2014-08.org.nvmexpress:uuid:b763db99-d065-4e3a-a56a-75b1513148fa,0000:01:00.0,0] get registers failed                                                
+[2025-09-29 22:37:53.596596] nvme_pcie.c: 518:nvme_pcie_ctrlr_map_pmr: *ERROR*: [nqn.2014-08.org.nvmexpress:uuid:b763db99-d065-4e3a-a56a-75b1513148fa,0000:01:00.0,0] get registers failed                                                
+[2025-09-29 22:37:53.596652] nvme_pcie.c: 972:nvme_pcie_ctrlr_construct: *ERROR*: [nqn.2014-08.org.nvmexpress:uuid:b763db99-d065-4e3a-a56a-75b1513148fa,0000:01:00.0,0] get_cap() failed                                                  
+[2025-09-29 22:37:53.596770] nvme.c: 613:nvme_ctrlr_probe: *ERROR*: Failed to construct NVMe controller for SSD: 0000:01:00.0                                                                                                             
+[2025-09-29 22:37:53.596799] nvme.c: 827:nvme_dummy_attach_fail_cb: *ERROR*: Failed to attach nvme ctrlr: trtype=PCIe adrfam=(null) traddr=0000:01:00.0 trsvcid= subnqn=, No such device                                                  
+PCI_BUS: Requested device 0000:01:00.0 cannot be used                                                                                                                                                                                     
+No active namespaces found.                                                                                                                                                                                                               
+Command failed for stride 9 with code 1                                                                                                                                                                                                   
+Probing NVMe controller at 0000:01:00.0                                                                                                                                                                                                   
+EAL: '-c <coremask>' option is deprecated, and will be removed in a future release                                                                                                                                                        
+EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead 
