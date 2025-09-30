@@ -310,9 +310,29 @@ run_queue_depth_burst(struct ns_entry *target)
 		struct spdk_nvme_io_qpair_opts opts;
 
 		spdk_nvme_ctrlr_get_default_io_qpair_opts(target->ctrlr, &opts, sizeof(opts));
-		if (g_cfg.queue_depth != 0) {
-			opts.io_queue_size = g_cfg.queue_depth;
+
+		uint32_t max_entries = cap.bits.mqes + 1;
+		uint32_t desired_depth = (g_cfg.queue_depth != 0) ? g_cfg.queue_depth : opts.io_queue_size;
+		if (desired_depth > max_entries) {
+			desired_depth = max_entries;
 		}
+
+		uint32_t queue_entries = opts.io_queue_size;
+		if (queue_entries < desired_depth) {
+			queue_entries = desired_depth;
+		}
+		if (queue_entries == desired_depth && queue_entries < max_entries) {
+			/* Leave one spare slot so the tail doorbell reflects the burst size. */
+			queue_entries++;
+		}
+		if (queue_entries > max_entries) {
+			queue_entries = max_entries;
+			if (desired_depth > queue_entries) {
+				desired_depth = queue_entries;
+			}
+		}
+
+		opts.io_queue_size = queue_entries;
 		if (opts.io_queue_requests < opts.io_queue_size) {
 			opts.io_queue_requests = opts.io_queue_size;
 		}
@@ -342,7 +362,7 @@ run_queue_depth_burst(struct ns_entry *target)
 		}
 
 		ctx->ns_entry = target;
-		ctx->queue_depth = opts.io_queue_size;
+		ctx->queue_depth = desired_depth;
 		ctx->base_lba = g_cfg.start_lba + (uint64_t)i;
 		ctx->outstanding = 0;
 
@@ -366,8 +386,8 @@ run_queue_depth_burst(struct ns_entry *target)
 			}
 		}
 
-		printf("  Qpair %u depth %u base LBA %" PRIu64 "\n",
-		       i, ctx->queue_depth, ctx->base_lba);
+		printf("  Qpair %u burst %u (SQ entries %u) base LBA %" PRIu64 "\n",
+		       i, ctx->queue_depth, queue_entries, ctx->base_lba);
 	}
 
 	if (max_lba_required > ns_size) {
