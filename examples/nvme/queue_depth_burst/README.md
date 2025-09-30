@@ -47,3 +47,19 @@ Set the queue depth explicitly to 512 entries per qpair:
 ```bash
 sudo ./build/examples/queue_depth_burst -Q 512
 ```
+
+## Automating stride sweeps
+
+Use the helper script to sweep the LBA stride (`-m`) and generate an IOPS
+trend. For example, run strides from 1 to 10,000 in steps of 100, saving both
+plot and CSV:
+
+```bash
+python3 examples/nvme/queue_depth_burst/sweep_stride_iops.py \
+  --binary ./build/examples/queue_depth_burst \
+  --transport "trtype:PCIe" \
+  --queue 1 \
+  --lba-span 1 \
+  --start 1 --stop 10000 --step 100 \
+  --save stride_iops.png --csv stride_iops.csv
+```
