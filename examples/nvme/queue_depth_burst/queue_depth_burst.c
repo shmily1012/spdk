@@ -99,7 +99,7 @@ cleanup(void)
 		free(ctrlr_entry);
 	}
 
-	while (detach_ctx != NULL) {
+	if (detach_ctx != NULL) {
 		spdk_nvme_detach_poll(detach_ctx);
 	}
 }
