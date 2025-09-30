@@ -467,6 +467,13 @@ parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 
 	snprintf(g_trid.subnqn, sizeof(g_trid.subnqn), "%s", SPDK_NVMF_DISCOVERY_NQN);
 
+	if (g_trid.trtype == SPDK_NVME_TRANSPORT_CUSTOM) {
+		if (spdk_nvme_transport_id_populate_trstring(&g_trid, "PCIe") != 0) {
+			fprintf(stderr, "Failed to set default transport type.\n");
+			return -EINVAL;
+		}
+	}
+
 	while ((opt = getopt_long(argc, argv, "hd:gi:r:q:Q:m:l:s:W", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 'h':
@@ -580,7 +587,10 @@ main(int argc, char **argv)
 	}
 
 	if (g_trid.trtype == SPDK_NVME_TRANSPORT_CUSTOM) {
-		snprintf(g_trid.trstring, sizeof(g_trid.trstring), "%d", SPDK_NVME_TRANSPORT_PCIE);
+		if (spdk_nvme_transport_id_populate_trstring(&g_trid, "PCIe") != 0) {
+			fprintf(stderr, "Unsupported transport requested.\n");
+			return EXIT_FAILURE;
+		}
 	}
 
 	if (spdk_env_init(&opts) != 0) {

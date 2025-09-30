@@ -24,11 +24,16 @@ ninja -C build examples/nvme/queue_depth_burst
 
 ## Example usage
 
-Run four queues, advancing by 16 LBAs per command while transferring eight
-blocks per command:
+Run four queues on the first local PCIe controller, advancing by 16 LBAs per
+command while transferring eight blocks per command. The `-r` argument is
+optional for PCIe, but shown here for completeness:
 
 ```bash
-sudo ./build/examples/queue_depth_burst -q 4 -m 16 -l 8
+sudo ./build/examples/queue_depth_burst \
+  -r "trtype:PCIe" \
+  -q 4 \
+  -m 16 \
+  -l 8
 ```
 
 Select an NVMe transport other than local PCIe by passing a transport ID:
