@@ -67,7 +67,7 @@ static struct app_config g_cfg = {
 	.lba_count = 8,
 	.start_lba = 0,
 	.lba_stride = 8,
-	.queue_depth = 0,
+	.queue_depth = 0x100,  /* Default to 256 entries, matching typical queue size */
 	.write = false,
 	.enable_vmd = false,
 };
