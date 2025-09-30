@@ -4,6 +4,7 @@
 import argparse
 import csv
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -77,8 +78,15 @@ def run_once(args: argparse.Namespace, stride: int) -> Optional[float]:
     for line in output.splitlines():
         if IOPS_TOKEN in line:
             try:
-                return float(line.split(IOPS_TOKEN, 1)[1].strip().split()[0])
+                _, value_str = line.split(":", 1)
+                return float(value_str.strip().split()[0])
             except (ValueError, IndexError):
+                match = re.search(r"([-+]?[0-9]*\.?[0-9]+)", line)
+                if match:
+                    try:
+                        return float(match.group(1))
+                    except ValueError:
+                        pass
                 continue
 
     sys.stderr.write(f"Unable to parse IOPS from stride {stride} output.\n")
