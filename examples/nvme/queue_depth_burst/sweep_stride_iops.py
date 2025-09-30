@@ -7,6 +7,7 @@ import math
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -141,6 +142,9 @@ def main() -> int:
     for stride in range(args.start, args.stop + 1, args.step):
         iops = run_once(args, stride)
         rows.append((stride, iops))
+
+        if not args.dry_run:
+            time.sleep(1.0)
 
     if args.csv:
         write_csv(args.csv, rows)
