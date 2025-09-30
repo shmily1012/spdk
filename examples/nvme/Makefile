@@ -8,7 +8,8 @@ SPDK_ROOT_DIR := $(abspath $(CURDIR)/../..)
 include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
 
 DIRS-y += hello_world reconnect nvme_manage arbitration \
-	hotplug cmb_copy abort pmr_persistence wrr_burst_test
+	hotplug cmb_copy abort pmr_persistence wrr_burst_test \
+	queue_depth_burst
 
 .PHONY: all clean $(DIRS-y)
 
