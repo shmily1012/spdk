@@ -326,19 +326,14 @@ run_queue_depth_burst(struct ns_entry *target)
 			goto cleanup;
 		}
 
-		uint32_t burst_depth = requested_entries;
-		if (burst_depth >= max_entries) {
-			burst_depth = max_entries - 1;
-		}
-
-		if (burst_depth == 0) {
-			burst_depth = 1;
-		}
-
-		uint32_t queue_entries = burst_depth + 1;
+		/* Use requested queue size directly as both queue size and burst depth */
+		uint32_t queue_entries = requested_entries;
 		if (queue_entries > max_entries) {
 			queue_entries = max_entries;
 		}
+
+		/* Burst depth equals queue size (doorbell rings with full queue depth) */
+		uint32_t burst_depth = queue_entries;
 
 		opts.io_queue_size = queue_entries;
 		if (opts.io_queue_requests < opts.io_queue_size) {
