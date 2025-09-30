@@ -1,8 +1,27 @@
-root@PAE-system:~/spdk# ./build/examples/queue_depth_burst -q 1 -m 64 -l 1
+root@PAE-system:~/spdk# ./build/examples/queue_depth_burst   -r "trtype:PCIe"   -q 1   -m 100   -l 1
 EAL: '-c <coremask>' option is deprecated, and will be removed in a future release
 EAL:    Use '-l <corelist>' or '--lcores=<corelist>' option instead
-[2025-09-29 21:34:01.395589] nvme.c:1039:spdk_nvme_trid_populate_transport: *ERROR*: no available transports
-[2025-09-29 21:34:01.395640] nvme.c: 765:nvme_probe_internal: *ERROR*: NVMe trtype 0 () not available
-[2025-09-29 21:34:01.395648] nvme.c: 883:spdk_nvme_probe_ext: *ERROR*: Create probe context failed
-spdk_nvme_probe() failed (Operation not permitted)
+Probing NVMe controller at 0000:01:00.0
+Attached to 0000:01:00.0
+  Namespace ID: 1 size: 3840GB
+
+Namespace 1 information:
+  Sector size          : 512 bytes
+  Total sectors        : 7501476528
+  Controller MQES      : 16384 entries
+  Qpair 0 depth 256 base LBA 0
+
+Burst parameters:
+  Queue pairs          : 1
+  Commands per queue   : 256
+  LBA stride           : 100
+  LBAs per command     : 1
+  Mode                 : read
+
+Results:
+  Commands completed   : 256
+  Errors               : 0
+  Elapsed time         : 0.001120 s
+  Simulated IOPS       : 228552.80
+Segmentation fault (core dumped)
 root@PAE-system:~/spdk# 
