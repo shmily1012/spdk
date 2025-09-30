@@ -343,7 +343,7 @@ run_queue_depth_burst(struct ns_entry *target)
 
 		ctx->ns_entry = target;
 		ctx->queue_depth = opts.io_queue_size;
-		ctx->base_lba = g_cfg.start_lba + (uint64_t)i * ctx->queue_depth * g_cfg.lba_stride;
+		ctx->base_lba = g_cfg.start_lba + (uint64_t)i;
 		ctx->outstanding = 0;
 
 		for (uint32_t j = 0; j < ctx->queue_depth; ++j) {
