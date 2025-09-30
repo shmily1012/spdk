@@ -312,24 +312,32 @@ run_queue_depth_burst(struct ns_entry *target)
 		spdk_nvme_ctrlr_get_default_io_qpair_opts(target->ctrlr, &opts, sizeof(opts));
 
 		uint32_t max_entries = cap.bits.mqes + 1;
-		uint32_t desired_depth = (g_cfg.queue_depth != 0) ? g_cfg.queue_depth : opts.io_queue_size;
-		if (desired_depth > max_entries) {
-			desired_depth = max_entries;
+		uint32_t requested_entries = (g_cfg.queue_depth != 0) ? g_cfg.queue_depth : opts.io_queue_size;
+
+		if (requested_entries == 0) {
+			SPDK_ERRLOG("Queue depth request resolved to zero.\n");
+			rc = -EINVAL;
+			goto cleanup;
 		}
 
-		uint32_t queue_entries = opts.io_queue_size;
-		if (queue_entries < desired_depth) {
-			queue_entries = desired_depth;
+		if (max_entries < 2) {
+			SPDK_ERRLOG("Controller MQES allows fewer than two SQ entries.\n");
+			rc = -ERANGE;
+			goto cleanup;
 		}
-		if (queue_entries == desired_depth && queue_entries < max_entries) {
-			/* Leave one spare slot so the tail doorbell reflects the burst size. */
-			queue_entries++;
+
+		uint32_t burst_depth = requested_entries;
+		if (burst_depth >= max_entries) {
+			burst_depth = max_entries - 1;
 		}
+
+		if (burst_depth == 0) {
+			burst_depth = 1;
+		}
+
+		uint32_t queue_entries = burst_depth + 1;
 		if (queue_entries > max_entries) {
 			queue_entries = max_entries;
-			if (desired_depth > queue_entries) {
-				desired_depth = queue_entries;
-			}
 		}
 
 		opts.io_queue_size = queue_entries;
@@ -362,7 +370,7 @@ run_queue_depth_burst(struct ns_entry *target)
 		}
 
 		ctx->ns_entry = target;
-		ctx->queue_depth = desired_depth;
+		ctx->queue_depth = burst_depth;
 		ctx->base_lba = g_cfg.start_lba + (uint64_t)i;
 		ctx->outstanding = 0;
 
