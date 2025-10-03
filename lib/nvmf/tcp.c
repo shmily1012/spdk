@@ -457,8 +457,9 @@ nvmf_tcp_req_get(struct spdk_nvmf_tcp_qpair *tqpair)
 	memset(&tcp_req->rsp, 0, sizeof(tcp_req->rsp));
 	tcp_req->h2c_offset = 0;
 	tcp_req->has_in_capsule_data = false;
-	tcp_req->req.dif_enabled = false;
+	tcp_req->req.raw = 0; /* clear all flags */
 	tcp_req->req.zcopy_phase = NVMF_ZCOPY_PHASE_NONE;
+	tcp_req->req.cmd_cb_fn = NULL;
 
 	TAILQ_REMOVE(&tqpair->tcp_req_free_queue, tcp_req, state_link);
 	TAILQ_INSERT_TAIL(&tqpair->tcp_req_working_queue, tcp_req, state_link);
@@ -559,12 +560,14 @@ nvmf_tcp_request_get_buffers_abort(struct spdk_nvmf_tcp_req *tcp_req)
 
 	assert(tcp_req->state == TCP_REQUEST_STATE_NEED_BUFFER);
 
-	STAILQ_FOREACH_SAFE(abort_req, &tcp_group->control_msg_list->waiting_for_msg_reqs, control_msg_link,
-			    tmp_req) {
-		if (abort_req == tcp_req) {
-			STAILQ_REMOVE(&tcp_group->control_msg_list->waiting_for_msg_reqs, abort_req, spdk_nvmf_tcp_req,
-				      control_msg_link);
-			return;
+	if (tcp_group->control_msg_list != NULL) {
+		STAILQ_FOREACH_SAFE(abort_req, &tcp_group->control_msg_list->waiting_for_msg_reqs,
+				    control_msg_link, tmp_req) {
+			if (abort_req == tcp_req) {
+				STAILQ_REMOVE(&tcp_group->control_msg_list->waiting_for_msg_reqs,
+					      abort_req, spdk_nvmf_tcp_req, control_msg_link);
+				return;
+			}
 		}
 	}
 

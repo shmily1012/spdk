@@ -36,40 +36,69 @@
 	(spdk_nvme_trtype_is_fabrics(nvme_ctrlr->active_path_id->trid.trtype) ? \
 	nvme_ctrlr->active_path_id->trid.subnqn : nvme_ctrlr->active_path_id->trid.traddr)
 
-#define CTRLR_ID(nvme_ctrlr)	(spdk_nvme_ctrlr_get_id(nvme_ctrlr->ctrlr))
+#define CTRLR_ID(nvme_ctrlr)   (spdk_nvme_ctrlr_get_id(nvme_ctrlr->ctrlr))
 
-#define NVME_CTRLR_ERRLOG(ctrlr, format, ...) \
-	SPDK_ERRLOG("[%s, %u] " format, CTRLR_STRING(ctrlr), CTRLR_ID(ctrlr), ##__VA_ARGS__);
+#define NVME_CTRLR_LOG_FMT "%s%s%s:%s,%u"
+#define NVME_CTRLR_LOG_ARGS(ctrlr) \
+  spdk_nvme_trtype_is_fabrics((ctrlr)->active_path_id->trid.trtype) ? (ctrlr)->active_path_id->trid.subnqn : "", \
+  spdk_nvme_trtype_is_fabrics((ctrlr)->active_path_id->trid.trtype) ? "," : "", \
+  (ctrlr)->active_path_id->trid.traddr, \
+  (ctrlr)->active_path_id->trid.trsvcid, \
+  CTRLR_ID(ctrlr)
 
-#define NVME_CTRLR_WARNLOG(ctrlr, format, ...) \
-	SPDK_WARNLOG("[%s, %u] " format, CTRLR_STRING(ctrlr), CTRLR_ID(ctrlr), ##__VA_ARGS__);
+#define NVME_BDEV_LOG_FMT "%s"
+#define NVME_BDEV_LOG_ARGS(nbdev) \
+  (nbdev)->disk.name
 
-#define NVME_CTRLR_NOTICELOG(ctrlr, format, ...) \
-	SPDK_NOTICELOG("[%s, %u] " format, CTRLR_STRING(ctrlr), CTRLR_ID(ctrlr), ##__VA_ARGS__);
+#define NVME_CTRLR_LOG(type, ctrlr, format, ...) do { \
+	if ((ctrlr)) { \
+		SPDK_##type##LOG("["NVME_CTRLR_LOG_FMT"] " format, NVME_CTRLR_LOG_ARGS(ctrlr), ##__VA_ARGS__); \
+	} else { \
+		SPDK_##type##LOG("[null ctrlr] " format, ##__VA_ARGS__); \
+	} \
+} while (0)
 
-#define NVME_CTRLR_INFOLOG(ctrlr, format, ...) \
-	SPDK_INFOLOG(bdev_nvme, "[%s, %u] " format, CTRLR_STRING(ctrlr), CTRLR_ID(ctrlr), ##__VA_ARGS__);
+#define NVME_CTRLR_LOG2(type, component, ctrlr, format, ...) do { \
+	if ((ctrlr)) { \
+		SPDK_##type##LOG(component, "["NVME_CTRLR_LOG_FMT"] " format, NVME_CTRLR_LOG_ARGS(ctrlr), ##__VA_ARGS__); \
+	} else { \
+		SPDK_##type##LOG(component, "[null ctrlr] " format, ##__VA_ARGS__); \
+	} \
+} while (0)
+
+#define NVME_CTRLR_ERRLOG(ctrlr, format, ...) NVME_CTRLR_LOG(ERR, ctrlr, format, ##__VA_ARGS__)
+#define NVME_CTRLR_WARNLOG(ctrlr, format, ...) NVME_CTRLR_LOG(WARN, ctrlr, format, ##__VA_ARGS__)
+#define NVME_CTRLR_NOTICELOG(ctrlr, format, ...) NVME_CTRLR_LOG(NOTICE, ctrlr, format, ##__VA_ARGS__)
+#define NVME_CTRLR_INFOLOG(ctrlr, format, ...) NVME_CTRLR_LOG2(INFO, bdev_nvme, ctrlr, format, ##__VA_ARGS__)
+
+#define NVME_BDEV_LOG(type, nbdev, format, ...) do { \
+	if ((nbdev)) { \
+		SPDK_##type##LOG("["NVME_BDEV_LOG_FMT"] " format, NVME_BDEV_LOG_ARGS(nbdev), ##__VA_ARGS__); \
+	} else { \
+		SPDK_##type##LOG("[null nbdev] " format, ##__VA_ARGS__); \
+	} \
+} while (0)
+
+#define NVME_BDEV_LOG2(type, component, nbdev, format, ...) do { \
+	if ((nbdev)) { \
+		SPDK_##type##LOG(component, "["NVME_BDEV_LOG_FMT"] " format, NVME_BDEV_LOG_ARGS(nbdev), ##__VA_ARGS__); \
+	} else { \
+		SPDK_##type##LOG(component, "[null nbdev] " format, ##__VA_ARGS__); \
+	} \
+} while (0)
+
+#define NVME_BDEV_ERRLOG(nbdev, format, ...) NVME_BDEV_LOG(ERR, nbdev, format, ##__VA_ARGS__)
+#define NVME_BDEV_WARNLOG(nbdev, format, ...) NVME_BDEV_LOG(WARN, nbdev, format, ##__VA_ARGS__)
+#define NVME_BDEV_NOTICELOG(nbdev, format, ...) NVME_BDEV_LOG(NOTICE, nbdev, format, ##__VA_ARGS__)
+#define NVME_BDEV_INFOLOG(nbdev, format, ...) NVME_BDEV_LOG2(INFO, bdev_nvme, nbdev, format, ##__VA_ARGS__)
 
 #ifdef DEBUG
-#define NVME_CTRLR_DEBUGLOG(ctrlr, format, ...) \
-	SPDK_DEBUGLOG(bdev_nvme, "[%s, %u] " format, CTRLR_STRING(ctrlr), CTRLR_ID(ctrlr), ##__VA_ARGS__);
+#define NVME_CTRLR_DEBUGLOG(ctrlr, format, ...) NVME_CTRLR_LOG2(DEBUG, bdev_nvme, ctrlr, format, ##__VA_ARGS__)
+#define NVME_BDEV_DEBUGLOG(ctrlr, format, ...) NVME_BDEV_LOG2(DEBUG, bdev_nvme, nbdev, format, ##__VA_ARGS__)
 #else
-#define NVME_CTRLR_DEBUGLOG(ctrlr, ...) do { } while (0)
+#define NVME_CTRLR_DEBUGLOG(...) do { } while (0)
+#define NVME_BDEV_DEBUGLOG(...) do { } while (0)
 #endif
-
-#define BDEV_STRING(nbdev) (nbdev->disk.name)
-
-#define NVME_BDEV_ERRLOG(nbdev, format, ...) \
-	SPDK_ERRLOG("[%s] " format, BDEV_STRING(nbdev), ##__VA_ARGS__);
-
-#define NVME_BDEV_WARNLOG(nbdev, format, ...) \
-	SPDK_WARNLOG("[%s] " format, BDEV_STRING(nbdev), ##__VA_ARGS__);
-
-#define NVME_BDEV_NOTICELOG(nbdev, format, ...) \
-	SPDK_NOTICELOG("[%s] " format, BDEV_STRING(nbdev), ##__VA_ARGS__);
-
-#define NVME_BDEV_INFOLOG(nbdev, format, ...) \
-	SPDK_INFOLOG(bdev_nvme, "[%s] " format, BDEV_STRING(nbdev), ##__VA_ARGS__);
 
 #define SPDK_BDEV_NVME_DEFAULT_DELAY_CMD_SUBMIT true
 #define SPDK_BDEV_NVME_DEFAULT_KEEP_ALIVE_TIMEOUT_IN_MS	(10000)
@@ -2059,10 +2088,8 @@ bdev_nvme_failover_trid(struct nvme_ctrlr *nvme_ctrlr, bool remove, bool start)
 
 	assert(path_id->trid.trtype != SPDK_NVME_TRANSPORT_PCIE);
 
-	NVME_CTRLR_NOTICELOG(nvme_ctrlr, "Start failover from %s:%s to %s:%s\n",
-			     path_id->trid.traddr, path_id->trid.trsvcid,
-			     next_path->trid.traddr, next_path->trid.trsvcid);
-
+	NVME_CTRLR_NOTICELOG(nvme_ctrlr, "Start failover to %s:%s\n", next_path->trid.traddr,
+			     next_path->trid.trsvcid);
 	spdk_nvme_ctrlr_fail(nvme_ctrlr->ctrlr);
 	nvme_ctrlr->active_path_id = next_path;
 	rc = spdk_nvme_ctrlr_set_trid(nvme_ctrlr->ctrlr, &next_path->trid);
@@ -2274,10 +2301,7 @@ bdev_nvme_reset_ctrlr_complete(struct nvme_ctrlr *nvme_ctrlr, bool success)
 			/* The next alternate trid exists and is ready to try. Try it now. */
 			pthread_mutex_unlock(&nvme_ctrlr->mutex);
 
-			NVME_CTRLR_INFOLOG(nvme_ctrlr, "Try the next alternate trid %s:%s now.\n",
-					   nvme_ctrlr->active_path_id->trid.traddr,
-					   nvme_ctrlr->active_path_id->trid.trsvcid);
-
+			NVME_CTRLR_INFOLOG(nvme_ctrlr, "Try the next alternate trid now.\n");
 			nvme_ctrlr_disconnect(nvme_ctrlr, bdev_nvme_reconnect_ctrlr);
 			return;
 		}
@@ -2495,7 +2519,6 @@ static int
 bdev_nvme_reconnect_ctrlr_poll(void *arg)
 {
 	struct nvme_ctrlr *nvme_ctrlr = arg;
-	struct spdk_nvme_transport_id *trid;
 	int rc = -ETIMEDOUT;
 
 	if (bdev_nvme_check_ctrlr_loss_timeout(nvme_ctrlr)) {
@@ -2513,15 +2536,7 @@ bdev_nvme_reconnect_ctrlr_poll(void *arg)
 
 	spdk_poller_unregister(&nvme_ctrlr->reset_detach_poller);
 	if (rc == 0) {
-		trid = &nvme_ctrlr->active_path_id->trid;
-
-		if (spdk_nvme_trtype_is_fabrics(trid->trtype)) {
-			NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was connected to %s:%s. Create qpairs.\n",
-					   trid->traddr, trid->trsvcid);
-		} else {
-			NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was connected. Create qpairs.\n");
-		}
-
+		NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was connected. Create qpairs.\n");
 		nvme_ctrlr_check_namespaces(nvme_ctrlr);
 
 		/* Recreate all of the I/O queue pairs */
@@ -5725,14 +5740,7 @@ static void
 nvme_ctrlr_create_done(struct nvme_ctrlr *nvme_ctrlr,
 		       struct nvme_async_probe_ctx *ctx)
 {
-	struct spdk_nvme_transport_id *trid = &nvme_ctrlr->active_path_id->trid;
-
-	if (spdk_nvme_trtype_is_fabrics(trid->trtype)) {
-		NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was created to %s:%s\n",
-				   trid->traddr, trid->trsvcid);
-	} else {
-		NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was created\n");
-	}
+	NVME_CTRLR_INFOLOG(nvme_ctrlr, "ctrlr was created\n");
 
 	spdk_io_device_register(nvme_ctrlr,
 				bdev_nvme_create_ctrlr_channel_cb,
@@ -6510,17 +6518,15 @@ bdev_nvme_check_secondary_trid(struct nvme_ctrlr *nvme_ctrlr,
 
 	/* Currently we only support failover to the same NQN. */
 	if (strncmp(trid->subnqn, nvme_ctrlr->active_path_id->trid.subnqn, SPDK_NVMF_NQN_MAX_LEN)) {
-		NVME_CTRLR_WARNLOG(nvme_ctrlr,
-				   "Failover from subnqn: %s to a different subnqn: %s is not supported currently\n",
-				   nvme_ctrlr->active_path_id->trid.subnqn, trid->subnqn);
+		NVME_CTRLR_WARNLOG(nvme_ctrlr, "Failover to a different subnqn: %s is not supported currently\n",
+				   trid->subnqn);
 		return -EINVAL;
 	}
 
 	/* Skip all the other checks if we've already registered this path. */
 	TAILQ_FOREACH(tmp_trid, &nvme_ctrlr->trids, link) {
 		if (!spdk_nvme_transport_id_compare(&tmp_trid->trid, trid)) {
-			NVME_CTRLR_WARNLOG(nvme_ctrlr, "This path (traddr: %s subnqn: %s) is already registered\n",
-					   trid->traddr, trid->subnqn);
+			NVME_CTRLR_WARNLOG(nvme_ctrlr, "This path is already registered\n");
 			return -EALREADY;
 		}
 	}
