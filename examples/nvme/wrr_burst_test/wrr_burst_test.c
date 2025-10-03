@@ -13,8 +13,21 @@
 
 #include "spdk_internal/nvme_util.h"
 
+#include "../../../lib/nvme/nvme_internal.h"
+#include "../../../lib/nvme/nvme_pcie_internal.h"
+
 #include <getopt.h>
 #include <inttypes.h>
+
+#define PCI_STATUS_OFFSET	0x06
+#define PCI_CAPABILITY_LIST	0x34
+#define PCI_STATUS_CAP_LIST	0x0010
+#define PCI_CAP_ID_EXP	0x10
+#define PCI_EXP_DEVCAP	0x04
+#define PCI_EXP_DEVCAP_MAX_PAYLOAD_MASK	0x7u
+#define PCI_EXP_DEVCTL	0x08
+#define PCI_EXP_DEVCTL_READRQ_SHIFT	12
+#define PCI_EXP_DEVCTL_READRQ_MASK	(0x7u << PCI_EXP_DEVCTL_READRQ_SHIFT)
 
 #define NUM_TEST_QPAIRS 9
 
@@ -33,6 +46,7 @@ struct app_config {
 	uint16_t mpw;
 	uint16_t lpw;
 	uint8_t arbitration_burst;
+	int mrrs_index;
 	enum io_mode mode;
 	const char *log_path;
 };
@@ -83,6 +97,7 @@ struct completion_vector {
 	size_t capacity;
 };
 
+/* Application defaults; tweakable via CLI. */
 static struct app_config g_cfg = {
 	.cmds_per_queue = 255,
 	.lba_count = 8,
@@ -93,6 +108,7 @@ static struct app_config g_cfg = {
 	.mpw = 16,
 	.lpw = 4,
 	.arbitration_burst = 7,
+	.mrrs_index = -1,
 	.mode = IO_MODE_READ,
 	.log_path = "wrr_burst_log.csv",
 };
@@ -200,13 +216,14 @@ usage(const char *program)
 	printf("      --mpw <w>\tMedium priority weight (1-256, default %u).\n", g_cfg.mpw);
 	printf("      --lpw <w>\tLow priority weight (1-256, default %u).\n", g_cfg.lpw);
 	printf("      --burst <v>\tArbitration burst (0-7, default %u).\n", g_cfg.arbitration_burst);
+	printf("      --mrrs <v>\tOverride Max Read Request Size (0=128B, default auto).\n");
 	printf("\n");
 	printf("Example:\n");
 	printf("  %s -r \"trtype:PCIe\" --hpw 64 --mpw 16 --lpw 4\n", program);
 }
 
 static int
-parse_positive_u32(const char *arg, uint32_t *value)
+parse_nonnegative_u32(const char *arg, uint32_t *value)
 {
 	char *endptr = NULL;
 	uint64_t tmp;
@@ -217,7 +234,16 @@ parse_positive_u32(const char *arg, uint32_t *value)
 	}
 
 	*value = (uint32_t)tmp;
-	if (*value == 0) {
+	return 0;
+}
+
+static int
+parse_positive_u32(const char *arg, uint32_t *value)
+{
+	int rc;
+
+	rc = parse_nonnegative_u32(arg, value);
+	if (rc != 0 || *value == 0) {
 		return -EINVAL;
 	}
 
@@ -239,6 +265,69 @@ parse_positive_u64(const char *arg, uint64_t *value)
 	return 0;
 }
 
+/* Program the PCIe Device Control MRRS field if the capability exists. */
+static int
+set_endpoint_mrrs(struct spdk_pci_device *pci_dev, uint8_t code)
+{
+	uint16_t status;
+	uint8_t pos;
+	int rc;
+	int depth = 0;
+
+	rc = spdk_pci_device_cfg_read16(pci_dev, &status, PCI_STATUS_OFFSET);
+	if (rc != 0) {
+		return rc;
+	}
+
+	if ((status & PCI_STATUS_CAP_LIST) == 0) {
+		return -ENOTSUP;
+	}
+
+	rc = spdk_pci_device_cfg_read8(pci_dev, &pos, PCI_CAPABILITY_LIST);
+	if (rc != 0) {
+		return rc;
+	}
+
+	while (pos != 0) {
+		uint8_t cap_id;
+
+		rc = spdk_pci_device_cfg_read8(pci_dev, &cap_id, pos);
+		if (rc != 0) {
+			return rc;
+		}
+
+		if (cap_id == PCI_CAP_ID_EXP) {
+			uint16_t devctl;
+			uint16_t new_devctl;
+			uint32_t devctl_offset = pos + PCI_EXP_DEVCTL;
+
+			rc = spdk_pci_device_cfg_read16(pci_dev, &devctl, devctl_offset);
+			if (rc != 0) {
+				return rc;
+			}
+
+			new_devctl = (uint16_t)((devctl & ~PCI_EXP_DEVCTL_READRQ_MASK) |
+				((uint16_t)code << PCI_EXP_DEVCTL_READRQ_SHIFT));
+			if (new_devctl == devctl) {
+				return 0;
+			}
+
+			return spdk_pci_device_cfg_write16(pci_dev, new_devctl, devctl_offset);
+		}
+
+		rc = spdk_pci_device_cfg_read8(pci_dev, &pos, pos + 1);
+		if (rc != 0) {
+			return rc;
+		}
+
+		if (++depth > 48) {
+			return -EFAULT;
+		}
+	}
+
+	return -ENOENT;
+}
+
 static int
 parse_weight(const char *arg, uint16_t *weight)
 {
@@ -258,6 +347,7 @@ parse_weight(const char *arg, uint16_t *weight)
 	return 0;
 }
 
+/* Parse CLI flags, populate env opts and overrides. */
 static int
 parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 {
@@ -273,6 +363,7 @@ parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 		{ "mpw", required_argument, NULL, 0x101 },
 		{ "lpw", required_argument, NULL, 0x102 },
 		{ "burst", required_argument, NULL, 0x103 },
+		{ "mrrs", required_argument, NULL, 0x104 },
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -379,12 +470,20 @@ parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 			}
 			break;
 		case 0x103:
-			rc = parse_positive_u32(optarg, &u32);
+			rc = parse_nonnegative_u32(optarg, &u32);
 			if (rc != 0 || u32 > 7U) {
 				fprintf(stderr, "Invalid arbitration burst '%s'\n", optarg);
 				return -ERANGE;
 			}
 			g_cfg.arbitration_burst = (uint8_t)u32;
+			break;
+		case 0x104:
+			rc = parse_nonnegative_u32(optarg, &u32);
+			if (rc != 0 || u32 > 5U) {
+				fprintf(stderr, "Invalid MRRS value '%s'\n", optarg);
+				return -ERANGE;
+			}
+			g_cfg.mrrs_index = (int)u32;
 			break;
 		default:
 			usage(argv[0]);
@@ -402,6 +501,7 @@ parse_args(int argc, char **argv, struct spdk_env_opts *env_opts)
 	return 0;
 }
 
+/* Track namespaces discovered on each controller. */
 static void
 register_ns(struct spdk_nvme_ctrlr *ctrlr, struct spdk_nvme_ns *ns)
 {
@@ -425,6 +525,7 @@ register_ns(struct spdk_nvme_ctrlr *ctrlr, struct spdk_nvme_ns *ns)
 	       (uintmax_t)(spdk_nvme_ns_get_size(ns) / (uint64_t)1024 / 1024 / 1024));
 }
 
+/* Record controller metadata and enumerate namespaces. */
 static void
 register_ctrlr(struct spdk_nvme_ctrlr *ctrlr)
 {
@@ -454,6 +555,7 @@ register_ctrlr(struct spdk_nvme_ctrlr *ctrlr)
 	}
 }
 
+/* Tear down controllers/namespaces and free buffers. */
 static void
 cleanup(void)
 {
@@ -477,6 +579,7 @@ cleanup(void)
 	}
 }
 
+/* Configure the controller before attaching. */
 static bool
 probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	 struct spdk_nvme_ctrlr_opts *opts)
@@ -499,6 +602,7 @@ probe_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	return true;
 }
 
+/* Attach callback populates tracking lists for later use. */
 static void
 attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	  struct spdk_nvme_ctrlr *ctrlr, const struct spdk_nvme_ctrlr_opts *opts)
@@ -510,6 +614,7 @@ attach_cb(void *cb_ctx, const struct spdk_nvme_transport_id *trid,
 	register_ctrlr(ctrlr);
 }
 
+/* Store completion metadata for later analysis. */
 static void
 io_complete(void *arg, const struct spdk_nvme_cpl *cpl)
 {
@@ -531,6 +636,7 @@ io_complete(void *arg, const struct spdk_nvme_cpl *cpl)
 	}
 }
 
+/* Populate SQ entries for a single qpair while deferring the doorbell. */
 static int
 submit_burst(struct qpair_ctx *ctx, struct spdk_nvme_ns *ns)
 {
@@ -572,6 +678,7 @@ submit_burst(struct qpair_ctx *ctx, struct spdk_nvme_ns *ns)
 	return 0;
 }
 
+/* Issue a single doorbell per qpair now that SQs are ready. */
 static void
 flush_submissions(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 {
@@ -601,6 +708,7 @@ reserve_completion_capacity(void)
 	return completion_vector_reserve((size_t)total);
 }
 
+/* Dump a CSV with submission/completion timing plus statistics. */
 static int
 dump_completion_log(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 {
@@ -670,9 +778,20 @@ dump_completion_log(struct qpair_ctx *qpairs, uint32_t num_qpairs)
 		rc = g_log_error;
 	}
 
+	printf("\nArbitration Configuration:\n");
+	printf("┌────────────────┬───────┐\n");
+	printf("│ Parameter      │ Value │\n");
+	printf("├────────────────┼───────┤\n");
+	printf("│ AB             │ %5u │\n", g_cfg.arbitration_burst);
+	printf("│ High Weight    │ %5u │\n", g_cfg.hpw);
+	printf("│ Middle Weight  │ %5u │\n", g_cfg.mpw);
+	printf("│ Low Weight     │ %5u │\n", g_cfg.lpw);
+	printf("└────────────────┴───────┘\n");
+
 	return rc;
 }
 
+/* Orchestrate queue creation, workload submission, and completion polling. */
 static int
 run_wrr_burst_test(struct ns_entry *target)
 {
@@ -687,6 +806,9 @@ run_wrr_burst_test(struct ns_entry *target)
 	uint64_t lbas_per_qpair = (uint64_t)g_cfg.cmds_per_queue * g_cfg.lba_count;
 	uint64_t total_lbas = lbas_per_qpair * NUM_TEST_QPAIRS;
 	uint64_t max_lba = g_cfg.start_lba + total_lbas;
+	const struct spdk_nvme_transport_id *ctrlr_trid;
+	bool ctrlr_is_pcie;
+	struct spdk_pci_device *pci_dev;
 	uint32_t i;
 	int rc = 0;
 
@@ -708,6 +830,20 @@ run_wrr_burst_test(struct ns_entry *target)
 		return rc;
 	}
 
+	ctrlr_trid = spdk_nvme_ctrlr_get_transport_id(target->ctrlr);
+	ctrlr_is_pcie = (ctrlr_trid != NULL && ctrlr_trid->trtype == SPDK_NVME_TRANSPORT_PCIE);
+	pci_dev = spdk_nvme_ctrlr_get_pci_device(target->ctrlr);
+	if (g_cfg.mrrs_index >= 0) {
+		if (pci_dev == NULL) {
+			SPDK_WARNLOG("Unable to override MRRS: PCI handle unavailable.\n");
+		} else {
+			int mrrs_rc = set_endpoint_mrrs(pci_dev, (uint8_t)g_cfg.mrrs_index);
+			if (mrrs_rc != 0) {
+				SPDK_WARNLOG("Failed to program MRRS index %d (rc=%d)\n", g_cfg.mrrs_index, mrrs_rc);
+			}
+		}
+	}
+
 	printf("\nConfig:\n");
 	printf("  Commands/qpair      : %u\n", g_cfg.cmds_per_queue);
 	printf("  LBAs/command        : %u\n", g_cfg.lba_count);
@@ -715,6 +851,11 @@ run_wrr_burst_test(struct ns_entry *target)
 	       g_cfg.hpw, g_cfg.mpw, g_cfg.lpw);
 	printf("  Arbitration burst   : %u\n", g_cfg.arbitration_burst);
 	printf("  Queue depth         : %u\n", g_cfg.queue_size);
+	if (g_cfg.mrrs_index >= 0) {
+		printf("  MRRS override      : %d (%u B)\n", g_cfg.mrrs_index, 128U << g_cfg.mrrs_index);
+	} else {
+		printf("  MRRS override      : auto\n");
+	}
 	printf("  Mode                : %s\n",
 	       (g_cfg.mode == IO_MODE_WRITE) ? "write" : "read");
 
@@ -737,7 +878,7 @@ run_wrr_burst_test(struct ns_entry *target)
 			goto cleanup;
 		}
 
-		memset(ctx->data_pool, (int)(i + 1), ctx->payload_size * g_cfg.cmds_per_queue);
+		memset(ctx->data_pool, (uint8_t)(i + 1), ctx->payload_size * g_cfg.cmds_per_queue);
 
 		ctx->entries = calloc(g_cfg.cmds_per_queue, sizeof(struct cmd_entry));
 		if (ctx->entries == NULL) {
@@ -756,6 +897,12 @@ run_wrr_burst_test(struct ns_entry *target)
 
 		ctx->qprio = priorities[i];
 		ctx->qid = spdk_nvme_qpair_get_id(ctx->qpair);
+		if (ctrlr_is_pcie) {
+			struct nvme_pcie_qpair *pqpair = nvme_pcie_qpair(ctx->qpair);
+			uint64_t sq_base = pqpair ? pqpair->cmd_bus_addr : 0;
+			printf("SQ%u_base_adr = 0x%" PRIx64 "\n",
+			       ctx->qid, sq_base);
+		}
 		ctx->index = i;
 		ctx->base_lba = g_cfg.start_lba + lbas_per_qpair * i;
 
@@ -765,6 +912,14 @@ run_wrr_burst_test(struct ns_entry *target)
 		rc = submit_burst(ctx, target->ns);
 		if (rc != 0) {
 			goto cleanup;
+		}
+	}
+
+	/* Emit a PCI config-space marker before issuing queue doorbells. */
+	if (pci_dev != NULL) {
+		int cfg_rc = spdk_pci_device_cfg_write16(pci_dev, 0xFFFF, 0x0);
+		if (cfg_rc != 0) {
+			SPDK_WARNLOG("Failed to write config marker (rc=%d)\n", cfg_rc);
 		}
 	}
 
@@ -801,6 +956,7 @@ cleanup:
 	return rc;
 }
 
+/* Entry point: parse CLI, probe devices, and kick off the test. */
 int
 main(int argc, char **argv)
 {

@@ -62,6 +62,8 @@ DEFINE_STUB(spdk_memory_domain_translate_data, int,
 DEFINE_STUB_V(spdk_memory_domain_invalidate_data, (struct spdk_memory_domain *domain,
 		void *domain_ctx, struct iovec *iov, uint32_t iovcnt));
 
+DEFINE_STUB_V(nvme_fabric_qpair_poll_cleanup, (struct spdk_nvme_qpair *qpair));
+
 static void
 nvme_transport_ctrlr_disconnect_qpair_done_mocked(struct spdk_nvme_qpair *qpair)
 {
@@ -240,10 +242,10 @@ nvme_tcp_ut_next_sge(void *cb_arg, void **address, uint32_t *length)
 static void
 test_nvme_tcp_build_sgl_request(void)
 {
-	struct nvme_tcp_qpair tqpair;
-	struct spdk_nvme_ctrlr ctrlr = {{0}};
-	struct nvme_tcp_req tcp_req = {0};
-	struct nvme_request req = {{0}};
+	struct nvme_tcp_qpair tqpair = {};
+	struct spdk_nvme_ctrlr ctrlr = {};
+	struct nvme_tcp_req tcp_req = {};
+	struct nvme_request req = {};
 	struct nvme_tcp_ut_bdev_io bio;
 	uint64_t i;
 	int rc;
@@ -468,9 +470,9 @@ static void
 test_nvme_tcp_req_complete_safe(void)
 {
 	bool rc;
-	struct nvme_tcp_req	tcp_req = {0};
-	struct nvme_request	req = {{0}};
-	struct nvme_tcp_qpair	tqpair = {{0}};
+	struct nvme_tcp_req	tcp_req = {};
+	struct nvme_request	req = {};
+	struct nvme_tcp_qpair	tqpair = {};
 
 	tcp_req.req = &req;
 	tcp_req.req->qpair = &tqpair.qpair;
@@ -534,8 +536,8 @@ test_nvme_tcp_req_init(void)
 {
 	struct nvme_tcp_qpair tqpair = {};
 	struct nvme_request req = {};
-	struct nvme_tcp_req tcp_req = {0};
-	struct spdk_nvme_ctrlr ctrlr = {{0}};
+	struct nvme_tcp_req tcp_req = {};
+	struct spdk_nvme_ctrlr ctrlr = {};
 	struct nvme_tcp_ut_bdev_io bio = {};
 	int rc;
 
@@ -596,7 +598,7 @@ test_nvme_tcp_req_init(void)
 static void
 test_nvme_tcp_req_get(void)
 {
-	struct nvme_tcp_req tcp_req = {0};
+	struct nvme_tcp_req tcp_req = {};
 	struct nvme_tcp_qpair tqpair = {};
 	struct nvme_tcp_pdu send_pdu = {};
 
